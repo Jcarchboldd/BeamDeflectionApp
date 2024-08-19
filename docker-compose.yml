@@ -1,0 +1,21 @@
+services:
+  beamdeflectionblazorapp:
+    image: beamdeflectionblazorapp:latest
+    build:
+      context: .
+      dockerfile: BeamDeflectionBlazorApp/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - mlapi
+
+  mlapi:
+    image: mlapi:latest
+    build:
+      context: .
+      dockerfile: MLAPI/Dockerfile
+    ports:
+      - "8082:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80

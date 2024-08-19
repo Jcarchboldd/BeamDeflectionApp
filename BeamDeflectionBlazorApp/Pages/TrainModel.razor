@@ -1,0 +1,139 @@
+﻿@page "/trainModel"
+@inject HttpClient Http
+
+<div class="container mt-5">
+    <h3>Train Beam Deflection Model</h3>
+
+    <!-- Use InputFile instead of input type="file" -->
+    <InputFile OnChange="LoadFile" />
+
+    <button class="btn btn-primary mt-3" @onclick="TrainModelAsync">Train Model</button>
+
+    @if (isTraining)
+    {
+        <div class="alert alert-info mt-3" role="alert">
+            Training model...
+        </div>
+    }
+</div>
+
+@code {
+    private Stream? csvStream;
+    private bool isTraining = false;
+
+    private async Task LoadFile(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+
+        long maxFileSize = 10 * 1024 * 1024; // 10 MB
+
+        csvStream = new MemoryStream();
+        await file.OpenReadStream(maxFileSize).CopyToAsync(csvStream);
+        csvStream.Position = 0; // Reset the stream position for reading
+    }
+
+    private async Task TrainModelAsync()
+    {
+        try
+        {
+            if (csvStream == null)
+            {
+                Console.WriteLine("Please select a file to train the model.");
+                return;
+            }
+
+            isTraining = true;
+
+            using var reader = new StreamReader(csvStream);
+            string? line;
+            var batch = new List<BeamDeflectionData>();
+            int batchSize = 1000;
+            int lineNumber = 0;
+
+            while ((line = await reader.ReadLineAsync()) != null)
+            {
+                lineNumber++;
+                var values = line.Split(',');
+
+                if (values.Length != 13) continue; // Skip invalid lines
+
+                // Check if all nodes can be parsed
+                bool canParseAllNodes = int.TryParse(values[0], out int loadNode) &&
+                double.TryParse(values[1], out double loadValue) &&
+                double.TryParse(values[2], out double node0) &&
+                double.TryParse(values[3], out double node1) &&
+                double.TryParse(values[4], out double node2) &&
+                double.TryParse(values[5], out double node3) &&
+                double.TryParse(values[6], out double node4) &&
+                double.TryParse(values[7], out double node5) &&
+                double.TryParse(values[8], out double node6) &&
+                double.TryParse(values[9], out double node7) &&
+                double.TryParse(values[10], out double node8) &&
+                double.TryParse(values[11], out double node9) &&
+                double.TryParse(values[12], out double node10);
+
+                if (!canParseAllNodes)
+                {
+                    Console.WriteLine($"Invalid data at line {lineNumber}");
+                    continue; // Skip invalid lines
+                } 
+
+                var data = new BeamDeflectionData
+                {
+                    LoadNode = int.Parse(values[0]),
+                    LoadValue = double.Parse(values[1]),
+                    Node0 = double.Parse(values[2]),
+                    Node1 = double.Parse(values[3]),
+                    Node2 = double.Parse(values[4]),
+                    Node3 = double.Parse(values[5]),
+                    Node4 = double.Parse(values[6]),
+                    Node5 = double.Parse(values[7]),
+                    Node6 = double.Parse(values[8]),
+                    Node7 = double.Parse(values[9]),
+                    Node8 = double.Parse(values[10]),
+                    Node9 = double.Parse(values[11]),
+                    Node10 = double.Parse(values[12])
+                };
+
+                batch.Add(data);
+
+                // When the batch size is reached, send it to the server
+                if (batch.Count >= batchSize)
+                {
+                    await SendBatchToApi(batch);
+                    batch.Clear(); // Clear the batch after sending
+                }
+            }
+
+            // Send any remaining data in the batch
+            if (batch.Count > 0)
+            {
+                await SendBatchToApi(batch);
+            }
+
+            Console.WriteLine("Model trained successfully.");
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("An error occurred while training the model: " + ex.Message);
+        }
+        finally
+        {
+            isTraining = false;
+        }
+    }
+
+    private async Task SendBatchToApi(List<BeamDeflectionData> batch)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(batch);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await Http.PostAsync("api/BeamDeflection/train", content);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Failed to send batch to API.");
+        }
+    }
+}

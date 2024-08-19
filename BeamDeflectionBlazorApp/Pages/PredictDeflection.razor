@@ -1,0 +1,48 @@
+﻿@page "/predict"
+@inject HttpClient Http
+
+<div class="container mt-5">
+    <h3>Beam Deflection Prediction</h3>
+
+    <div class="form-group">
+        <label for="loadNode">Node (0-10):</label>
+        <input type="number" id="loadNode" class="form-control" @bind="input.LoadNode" min="0" max="10" />
+    </div>
+
+    <div class="form-group">
+        <label for="loadValue">Load Value (N):</label>
+        <input type="number" id="loadValue" class="form-control" @bind="input.LoadValue" />
+    </div>
+
+    <button class="btn btn-primary mt-3" @onclick="PredictDeflectionAsync">Predict Deflection</button>
+
+    @if (prediction != null)
+    {
+        <h4>Predicted Deflections</h4>
+        <ul>
+            @for (int i = 0; i < prediction.Deflections.Length; i++)
+            {
+                <li>Node @i: @prediction.Deflections[i] m</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private BeamDeflectionData input = new BeamDeflectionData();
+    private BeamDeflectionPrediction? prediction;
+
+    private async Task PredictDeflectionAsync()
+    {
+        var response = await Http.PostAsJsonAsync("api/BeamDeflection/predict", input);
+
+        if (response.IsSuccessStatusCode)
+        {
+            prediction = await response.Content.ReadFromJsonAsync<BeamDeflectionPrediction>();
+        }
+        else
+        {
+            Console.WriteLine("Prediction failed.");
+        }
+    }
+}

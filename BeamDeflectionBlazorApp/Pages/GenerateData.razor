@@ -1,0 +1,102 @@
+﻿@page "/generateData"
+@inject IBeamDeflectionService DeflectionService
+
+<div class="container mt-5">
+    <h3 class="mb-4">Generate Beam Deflection Data</h3>
+
+    <div class="mb-3">
+        <label for="totalSteps" class="form-label">Total Load Value (N) [Max 1,000,000]:</label>
+        <input type="number" id="totalSteps" class="form-control" @bind="totalLoadValue" min="10000" max="1000000" step="1000" />
+    </div>
+
+    <div class="mb-3">
+        <label for="loadStep" class="form-label">Load Step Increment (N) [Min 1,000]:</label>
+        <input type="number" id="loadStep" class="form-control" @bind="loadStep" min="1000" max="10000" step="1000" />
+    </div>
+
+    @if (isGenerating)
+    {
+        <div class="alert alert-info" role="alert">
+            <strong>Generating CSV Data...</strong>
+        </div>
+    }
+    else
+    {
+        <button class="btn btn-primary" @onclick="GenerateDataAsync">
+            <span class="bi bi-file-earmark-plus" role="status" aria-hidden="true" @(isGenerating ? "visible" : "invisible")></span>
+            Generate CSV Data
+        </button>
+    }
+
+    @if (!string.IsNullOrEmpty(downloadLink))
+    {
+        <div class="mt-4">
+            <a href="@downloadLink" download="@fileName" class="btn btn-success">Download CSV File</a>
+        </div>
+    }
+</div>
+
+@code {
+    private int totalLoadValue = 1000000;
+    private int loadStep = 1000;
+    private bool isGenerating = false;
+    private string? downloadLink;
+    private string? fileName;
+
+    private async Task GenerateDataAsync()
+    {
+        // Validate totalLoadValue and loadStep
+        if (totalLoadValue > 1000000)
+        {
+            totalLoadValue = 1000000;
+        }
+        if (loadStep < 1000)
+        {
+            loadStep = 1000;
+        }
+
+        isGenerating = true;
+
+        // Generate data and update progress bar
+        var csvData = await GenerateDataWithProgressAsync(loadStep, totalLoadValue);
+
+        // Convert to byte array for downloading
+        var csvBytes = Encoding.UTF8.GetBytes(csvData);
+        var base64 = Convert.ToBase64String(csvBytes);
+
+        // Create download link
+        downloadLink = $"data:text/csv;base64,{base64}";
+        fileName = $"beam_deflection_data_{Guid.NewGuid()}.csv";
+
+        isGenerating = false;
+    }
+
+    private async Task<string> GenerateDataWithProgressAsync(int loadStep, int totalLoadValue)
+    {
+        StringBuilder csv = new StringBuilder();
+        csv.AppendLine("LoadNode,LoadValue,Node0,Node1,Node2,Node3,Node4,Node5,Node6,Node7,Node8,Node9,Node10");
+
+        var calculator = new BeamDeflectionCalculator();
+        int totalSteps = (totalLoadValue - 10000) / loadStep + 1;
+        int currentStep = 0;
+
+        for (int loadNode = 0; loadNode <= 10; loadNode++)
+        {
+            for (double loadValue = 10000; loadValue <= totalLoadValue; loadValue += loadStep)
+            {
+                var deflections = await DeflectionService.CalculateDeflectionsAsync(loadNode, loadValue);
+
+                var line = $"{loadNode},{loadValue.ToString("F2")}";
+                foreach (var deflection in deflections.Values)
+                {
+                    line += $",{deflection}";
+                }
+                csv.AppendLine(line);
+
+                currentStep++;
+            }
+        }
+
+        return csv.ToString();
+    }
+}

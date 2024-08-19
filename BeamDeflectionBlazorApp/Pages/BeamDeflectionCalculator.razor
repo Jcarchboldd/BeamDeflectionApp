@@ -1,0 +1,83 @@
+﻿@page "/defectionCalculator"
+
+@inject IBeamDeflectionService DeflectionService
+
+<div class="container mt-4">
+    <h3 class="mb-4">Beam Deflection Calculator</h3>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label for="nodeInput" class="form-label">Node (0 to 10):</label>
+            <input type="number" class="form-control" id="nodeInput" @bind="loadNode" min="0" max="10" />
+        </div>
+        <div class="col-md-6">
+            <label for="loadInput" class="form-label">Load Value (N):</label>
+            <input type="number" class="form-control" id="loadInput" @bind="loadValue" min="0" />
+        </div>
+    </div>
+
+    <button class="btn btn-primary mb-4" @onclick="ApplyLoadAndCalculateDeflectionsAsync">
+        Apply Load and Calculate Deflections
+    </button>
+
+    <!-- Accordion for Beam and Material Properties -->
+    <div class="accordion mb-4" id="beamPropertiesAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingProperties">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseProperties" aria-expanded="false" aria-controls="collapseProperties">
+                    Beam and Material Properties
+                </button>
+            </h2>
+            <div id="collapseProperties" class="accordion-collapse collapse" aria-labelledby="headingProperties" data-bs-parent="#beamPropertiesAccordion">
+                <div class="accordion-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>Length of the Beam:</strong> 10.0 meters</li>
+                        <li class="list-group-item"><strong>Young's Modulus (E):</strong> 210 GPa (Steel)</li>
+                        <li class="list-group-item"><strong>Moment of Inertia (I):</strong> 8.33e-6 m<sup>4</sup></li>
+                        <li class="list-group-item"><strong>Number of Segments:</strong> 10 elements</li>
+                        <li class="list-group-item"><strong>Boundary Conditions:</strong> Fixed at both ends</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Accordion for Deflection Results -->
+    <div class="accordion mb-4" id="deflectionResultsAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="headingResults">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseResults" aria-expanded="false" aria-controls="collapseResults">
+                    Deflection Results
+                </button>
+            </h2>
+            <div id="collapseResults" class="accordion-collapse collapse" aria-labelledby="headingResults" data-bs-parent="#deflectionResultsAccordion">
+                <div class="accordion-body">
+                    <ul class="list-group list-group-flush">
+                        @if (deflections != null)
+                        {
+                            @foreach (var deflection in deflections)
+                            {
+                                <li class="list-group-item">Node @deflection.Key: @deflection.Value.ToString("0.000") mm</li>
+                            }
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4>Beam Visualization:</h4>
+    <canvas id="beamCanvas" class="border rounded" width="800" height="200"></canvas>
+</div>
+
+@code {
+    private int loadNode = 5; // Default node value
+    private double loadValue = 1000000; // Default positive load value
+    private Dictionary<int, double> deflections = new Dictionary<int, double>();
+
+    private async Task ApplyLoadAndCalculateDeflectionsAsync()
+    {
+        deflections = await DeflectionService.CalculateDeflectionsAsync(loadNode, loadValue);
+        await DeflectionService.RenderBeamAsync(deflections, loadNode);
+    }
+}
